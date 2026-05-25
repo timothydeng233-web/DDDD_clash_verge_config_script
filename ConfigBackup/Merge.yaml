@@ -1,0 +1,136 @@
+prepend-rules:
+  - DOMAIN,hjlyywp.com,DIRECT
+  - DOMAIN-SUFFIX,hjlyywp.com,DIRECT
+  - DOMAIN,newapi.hjlyywp.com,DIRECT
+  - DOMAIN,aixor.org,DIRECT
+  - DOMAIN-SUFFIX,aixor.org,DIRECT
+
+  # =====================================================================
+  # 进程级本地直连与代理规则（防止本地开发工具回环被代理拦截）
+  # =====================================================================
+  - PROCESS-NAME,Code.exe,选择节点
+  - PROCESS-NAME,Code - Insiders.exe,选择节点
+  - PROCESS-NAME,Codex.exe,选择节点
+  - PROCESS-NAME,codex.exe,选择节点
+  - PROCESS-NAME,msedgewebview2.exe,选择节点
+  - PROCESS-NAME,chrome.exe,选择节点
+  - PROCESS-NAME,msedge.exe,选择节点
+
+  # =====================================================================
+  # Google & Gemini & Antigravity 核心规则 (走代理，纠正原 DIRECT 错误)
+  # =====================================================================
+  - DOMAIN,accounts.google.com,选择节点     # 修正：国内直连必挂，必须走代理进行统一账户登录
+  - DOMAIN,id.google.com,选择节点           # 修正：走代理
+  - DOMAIN,oauth2.googleapis.com,选择节点   # 修正：OAuth 核心获取 Token，走代理
+  - DOMAIN,ogs.google.com,选择节点
+  - DOMAIN,clients6.google.com,选择节点
+  - DOMAIN,serviceusage.googleapis.com,选择节点
+  - DOMAIN,cloudaicompanion.googleapis.com,选择节点
+  - DOMAIN,cloudcode-pa.googleapis.com,选择节点
+  - DOMAIN,cloudresourcemanager.googleapis.com,选择节点
+  - DOMAIN,people.googleapis.com,选择节点
+  - DOMAIN,firebaselogging-pa.googleapis.com,选择节点
+  - DOMAIN,feedback-pa.googleapis.com,选择节点
+  - DOMAIN,apihub.googleapis.com,选择节点
+  - DOMAIN,generativelanguage.googleapis.com,选择节点
+  - DOMAIN,www.googleapis.com,选择节点
+  - DOMAIN,play.googleapis.com,选择节点
+  - DOMAIN,aistudio.google.com,选择节点
+  - DOMAIN,gemini.google.com,选择节点
+  - DOMAIN,scholar.google.com,选择节点
+  - DOMAIN,scholar.google.com.hk,选择节点
+  - DOMAIN,lh3.googleusercontent.com,选择节点
+  - DOMAIN,lh5.googleusercontent.com,选择节点
+
+  # Google 后备通配符代理
+  - DOMAIN-SUFFIX,google.com,选择节点
+  - DOMAIN-SUFFIX,google.com.hk,选择节点
+  - DOMAIN-SUFFIX,googleapis.com,选择节点
+  - DOMAIN-SUFFIX,gstatic.com,选择节点
+  - DOMAIN-SUFFIX,googleusercontent.com,选择节点
+  - DOMAIN-SUFFIX,developers.google.com,选择节点
+  - DOMAIN-SUFFIX,google.dev,选择节点
+  - DOMAIN-SUFFIX,ggpht.com,选择节点
+  - DOMAIN-SUFFIX,1e100.net,选择节点
+  - DOMAIN-SUFFIX,antigravity.google,选择节点
+  - DOMAIN-SUFFIX,gvt1.com,选择节点
+
+  # =====================================================================
+  # GitHub Copilot & GitHub 核心规则
+  # =====================================================================
+  - DOMAIN,api.individual.githubcopilot.com,选择节点
+  - DOMAIN,telemetry.individual.githubcopilot.com,选择节点
+  - DOMAIN,api.githubcopilot.com,选择节点
+  - DOMAIN,proxy.individual.githubcopilot.com,选择节点
+  - DOMAIN,copilot-proxy.githubusercontent.com,选择节点
+  - DOMAIN-SUFFIX,githubcopilot.com,选择节点
+  - DOMAIN-SUFFIX,github.com,选择节点
+  - DOMAIN-SUFFIX,githubusercontent.com,选择节点
+  - DOMAIN-SUFFIX,githubassets.com,选择节点
+
+  # =====================================================================
+  # OpenAI & ChatGPT & Codex 核心规则
+  # =====================================================================
+  - DOMAIN,api.openai.com,选择节点
+  - DOMAIN,chatgpt.com,选择节点
+  - DOMAIN,auth.openai.com,选择节点
+  - DOMAIN-SUFFIX,openai.com,选择节点
+  - DOMAIN-SUFFIX,chatgpt.com,选择节点
+  - DOMAIN-SUFFIX,oaistatic.com,选择节点
+  - DOMAIN-SUFFIX,oaiusercontent.com,选择节点
+
+  # 微软及其他依赖服务
+  - DOMAIN,default.exp-tas.com,选择节点
+  - DOMAIN-SUFFIX,exp-tas.com,选择节点
+  - DOMAIN,main.vscode-cdn.net,选择节点
+  - DOMAIN-SUFFIX,vscode-cdn.net,选择节点
+  - DOMAIN,update.code.visualstudio.com,选择节点
+  - DOMAIN,marketplace.visualstudio.com,选择节点
+  - DOMAIN-SUFFIX,visualstudio.com,选择节点
+  - DOMAIN,mobile.events.data.microsoft.com,选择节点
+  - DOMAIN-SUFFIX,events.data.microsoft.com,选择节点
+  - DOMAIN,ax-ring.msedge.net,选择节点
+  - DOMAIN-SUFFIX,msedge.net,选择节点
+  - DOMAIN-SUFFIX,bing.com,选择节点
+  - DOMAIN-SUFFIX,live.net,选择节点
+  - DOMAIN-SUFFIX,open-vsx.org,选择节点
+  - DOMAIN-SUFFIX,inroi.shop,DIRECT
+  - PROCESS-NAME,Telegram.exe,选择节点
+
+profile:
+  store-selected: true
+  block-quic: true      # 强力阻断 QUIC，防止浏览器握手回落到卡顿节点，强制走高速 TCP 代理隧道
+
+ipv6: false
+
+tun:
+  enable: true
+  stack: mixed          # mixed 栈是当前在 Windows 上网络性能和兼容性最平衡的选择
+  device: clash-core
+  auto-route: true
+  auto-detect-interface: true
+  mtu: 1500             # 强制锁定虚拟网卡 MTU 为 1500，完美适配物理网卡并打通 WSL2 镜像网络
+
+dns:
+  enable: true
+  ipv6: false
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  
+  # =====================================================================
+  # 瘦身后的 fake-ip-filter (100% 根除 DNS 污染，提升网络吞吐效率)
+  # =====================================================================
+  fake-ip-filter:
+    # 1. 本地环回与局域网解析（核心防御：杜绝本地 gRPC 及 OAuth 登录回调被 fake-ip 污染）
+    - "localhost"
+    - "127.0.0.1"
+    - "::1"
+    - "*.local"
+    - "localhost.ptlogin2.qq.com"
+
+    # 2. 国内直连与内网镜像加速（强制本地真实解析，提高拉取速度）
+    - "mirrors.pku.edu.cn"
+    - "mirrors.tuna.tsinghua.edu.cn"
+    - "mirrors.aliyun.com"
+    - "mirrors.ustc.edu.cn"
