@@ -1,4 +1,8 @@
 prepend-rules:
+  - DOMAIN,hjlyy.cc,DIRECT
+  - DOMAIN-SUFFIX,hjlyy.cc,DIRECT
+  - DOMAIN,cn.aixor.org,DIRECT
+  - DOMAIN,www.inroi.shop,🔰 选择节点
   - DOMAIN,hjlyywp.com,DIRECT
   - DOMAIN-SUFFIX,hjlyywp.com,DIRECT
   - DOMAIN,newapi.hjlyywp.com,DIRECT
@@ -94,7 +98,6 @@ prepend-rules:
   - DOMAIN-SUFFIX,bing.com,选择节点
   - DOMAIN-SUFFIX,live.net,选择节点
   - DOMAIN-SUFFIX,open-vsx.org,选择节点
-  - DOMAIN-SUFFIX,inroi.shop,DIRECT
   - PROCESS-NAME,Telegram.exe,选择节点
 
 profile:
