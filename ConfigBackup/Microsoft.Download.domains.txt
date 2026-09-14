@@ -1,0 +1,17 @@
+# Microsoft Store、Windows Update 与 Delivery Optimization 下载端点
+# 默认 DIRECT，以使用本地 CDN；可用 -MicrosoftDownloadGroup 显式覆盖。
+# 格式：Mihomo规则类型,域名
+DOMAIN-SUFFIX,prod.do.dsp.mp.microsoft.com
+DOMAIN-SUFFIX,dl.delivery.mp.microsoft.com
+DOMAIN-SUFFIX,delivery.mp.microsoft.com
+DOMAIN-SUFFIX,update.microsoft.com
+DOMAIN-SUFFIX,windowsupdate.com
+DOMAIN,download.windowsupdate.com
+DOMAIN,tsfe.trafficshaping.dsp.mp.microsoft.com
+DOMAIN,adl.windows.com
+DOMAIN,definitionupdates.microsoft.com
+DOMAIN,img-prod-cms-rt-microsoft-com.akamaized.net
+DOMAIN,img-s-msn-com.akamaized.net
+DOMAIN,store-images.s-microsoft.com
+DOMAIN-SUFFIX,officecdn.microsoft.com
+DOMAIN-SUFFIX,cdn.office.net

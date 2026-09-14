@@ -1,0 +1,33 @@
+# Microsoft 登录、Microsoft Store 控制面与常用应用服务
+# 不使用 DOMAIN-SUFFIX,microsoft.com，避免把全部微软流量强制送往一个出口。
+# 格式：Mihomo规则类型,域名
+DOMAIN,login.live.com
+DOMAIN,login.microsoftonline.com
+DOMAIN,account.microsoft.com
+DOMAIN,logincdn.msauth.net
+DOMAIN,store.microsoft.com
+DOMAIN,apps.microsoft.com
+DOMAIN,storeedgefd.dsx.mp.microsoft.com
+DOMAIN,livetileedge.dsx.mp.microsoft.com
+DOMAIN,storesdk.dsx.mp.microsoft.com
+DOMAIN-SUFFIX,displaycatalog.mp.microsoft.com
+DOMAIN-SUFFIX,licensing.mp.microsoft.com
+DOMAIN,storecatalogrevocation.storequality.microsoft.com
+DOMAIN,manage.devcenter.microsoft.com
+DOMAIN,share.microsoft.com
+DOMAIN-SUFFIX,wns.windows.com
+DOMAIN,www.office.com
+DOMAIN,office.com
+DOMAIN,outlook.office365.com
+DOMAIN,blobs.officehome.msocdn.com
+DOMAIN,officeclient.microsoft.com
+DOMAIN,odc.officeapps.live.com
+DOMAIN,onedrive.live.com
+DOMAIN,api.onedrive.com
+DOMAIN,oneclient.sfx.ms
+DOMAIN,g.live.com
+DOMAIN,config.teams.microsoft.com
+DOMAIN,teams.live.com
+DOMAIN,to-do.microsoft.com
+DOMAIN,edge.microsoft.com
+DOMAIN,msedge.api.cdp.microsoft.com

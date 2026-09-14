@@ -1,0 +1,21 @@
+# OpenAI / ChatGPT / Codex 网络依赖规则定义
+# 格式：Mihomo规则类型,域名
+# 更新清单时应同时运行 -Action Audit 或 -Action Test 检查实际路由。
+DOMAIN-SUFFIX,openai.com
+DOMAIN-SUFFIX,chatgpt.com
+DOMAIN-SUFFIX,oaistatic.com
+DOMAIN-SUFFIX,oaiusercontent.com
+DOMAIN-SUFFIX,oaistatsig.com
+DOMAIN-SUFFIX,openaimerge.com
+DOMAIN-SUFFIX,intercom.io
+DOMAIN-SUFFIX,intercomcdn.com
+DOMAIN-SUFFIX,workos.com
+DOMAIN-SUFFIX,workoscdn.com
+DOMAIN,workos.imgix.net
+DOMAIN-SUFFIX,ct.sendgrid.net
+DOMAIN,challenges.cloudflare.com
+DOMAIN,js.stripe.com
+DOMAIN,o207216.ingest.sentry.io
+DOMAIN,o33249.ingest.sentry.io
+DOMAIN,rum.browser-intake-datadoghq.com
+DOMAIN,humb.apple.com

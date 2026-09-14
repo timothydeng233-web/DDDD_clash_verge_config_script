@@ -1,0 +1,5 @@
+# 学术 PDF/静态资源链路。正文、登录和机构认证不在这里强制分流。
+# 默认 DIRECT，以便交给 Windows 路由和 EasyConnect；目标电脑可通过 -AcademicGroup 覆盖。
+DOMAIN,pdf.sciencedirectassets.com
+DOMAIN-SUFFIX,sciencedirectassets.com
+DOMAIN-SUFFIX,els-cdn.com

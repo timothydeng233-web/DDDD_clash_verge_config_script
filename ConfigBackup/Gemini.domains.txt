@@ -1,0 +1,17 @@
+# Gemini / Google AI / Gemini Code Assist 网络依赖规则定义
+# 仅维护服务专用端点；通用 Google 静态资源继续由 Merge.yaml 的 Google 规则覆盖。
+# 格式：Mihomo规则类型,域名
+DOMAIN,gemini.google.com
+DOMAIN,aistudio.google.com
+DOMAIN,generativelanguage.googleapis.com
+DOMAIN,cloudaicompanion.googleapis.com
+DOMAIN,cloudcode-pa.googleapis.com
+DOMAIN,cloudresourcemanager.googleapis.com
+DOMAIN,people.googleapis.com
+DOMAIN,firebaselogging-pa.googleapis.com
+DOMAIN,feedback-pa.googleapis.com
+DOMAIN,apihub.googleapis.com
+DOMAIN,accounts.google.com
+DOMAIN,oauth2.googleapis.com
+DOMAIN,lh3.googleusercontent.com
+DOMAIN,lh5.googleusercontent.com

@@ -1,0 +1,3 @@
+# 私有规则示例。真实域名请放入被 .gitignore 排除的 *.local.yaml。
+prepend-rules:
+  - DOMAIN,internal.example.com,DIRECT

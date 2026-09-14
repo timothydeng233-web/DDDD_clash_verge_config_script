@@ -1,92 +1,221 @@
-# Clash Verge Rev 多端配置一键同步与恢复工具
+# Clash Verge Rev Codex 本机适配工具
 
-本工具用于实现多台 Windows 电脑上 **Clash Verge Rev** 客户端配置的快速统一部署与分流规则同步，并提供了完善的双向备份与一键无损还原机制。本同步包不包含任何具体的订阅链接和节点数据，支持在不同机器上安全分发。
+本项目是一套供 Codex 审计并按目标 Windows 电脑实际情况生成配置的模板，不是可以在所有电脑上原样覆盖的固定配置包。
 
----
+> [!WARNING]
+> 禁止未经审计直接部署。每台电脑的安装目录、配置目录、订阅策略组、WSL 网络模式、出口 MTU 和现有配置都可能不同。脚本默认仅执行只读 `Audit`。
 
-## 💡 项目功能与作用
+## 功能
 
-1. **软件自动检测与静默安装**：自动检测本机是否安装 Clash Verge Rev。若未安装，将调用 Windows 包管理器 `winget` 自动下载并静默完成官方安装。
-2. **强制启用 TUN 模式**：通过配置统一，确保客户端强制开启 TUN 模式，实现在网络层对系统全局流量（包括 WSL2 内部流量）的透明代理。
-3. **关闭系统代理**：关闭系统代理（System Proxy），避免本地回环流量（如 gRPC、WebSocket 等进程间高频本地通信）误入代理导致卡死。
-4. **锁定网络端口**：锁定网络混合端口为 `7897`，保持多台电脑命令行及 API 端口一致。
-5. **锁定 Meta/Mihomo 内核**：统一指定使用 mihomo 内核，保证高级规则与网卡参数的最大兼容性。
-6. **锁定 TUN 网卡 MTU**：锁定虚拟网卡 MTU 为 `1500`，彻底解决 WSL2 在镜像模式（`mirrored`）下因 MTU 巨型帧不匹配导致 HTTPS 握手包被物理网卡丢弃的问题。
-7. **优化 DNS Fake-IP 过滤**：瘦身 `fake-ip-filter`，排除 `localhost`、`127.0.0.1` 环回流量被代理污染，同时移除了大量海外域名，彻底规避国内 DNS 污染，提升网络握手成功率与速度。
-8. **完善的无损双向配置恢复**：在首次部署时会自动在本地对原配置进行 `.bak` 强锁备份，支持随时双击还原，无感退回部署前的初始状态。
+- 从进程、注册表、WinGet、Scoop 和常见目录动态检测 Clash Verge Rev。
+- 使用当前官方 WinGet ID 安装客户端，但只有显式传入 `-InstallIfMissing` 才会安装。
+- 自动读取最终生成的 `clash-verge.yaml`，识别本机订阅策略组。
+- 基于本机现有 `verge.yaml` 修改少量必要字段，不覆盖主题、快捷键、日志等个人设置。
+- 根据真实策略组生成本机专用 `Merge.yaml`。
+- 统一生成 OpenAI、ChatGPT、Codex 登录、静态资源、身份认证和 WebSocket 相关规则。
+- 支持 Gemini、Google AI Studio、Gemini API、Google 登录和 Code Assist。
+- 支持 Microsoft Store、微软账号、Office、OneDrive、Teams、Edge 和 Windows Update 关键链路。
+- 为 ScienceDirect PDF、`sciencedirectassets.com` 与 Elsevier 辅助 CDN 提供优先直连规则，减少校园 VPN 与海外代理出口混用。
+- Microsoft 控制链路与大型下载链路可以分别选择出口；两者默认 `DIRECT`。
+- 审计 OpenAI、Gemini 和 Microsoft 域名是否使用预期策略组。
+- 检查 Microsoft Store 应用包、许可证/安装/更新服务、WinHTTP 代理、Chrome 与 Clash 端口。
+- 可运行不带账号和密钥的 OpenAI、Gemini、Microsoft 和学术网站公共端点测试。
+- 只读审计 Chrome 原生 PDF 设置、Adobe Acrobat 扩展及相关企业策略，辅助区分浏览器扩展故障和网络故障。
+- 提供 `IsolatedTest`：先在系统临时目录生成、检查并由 Mihomo 校验配置，再执行连通测试，全程对比本机运行配置哈希且不部署。
+- 提供 PowerShell `Auto`（TUN）、`Session` 和显式 `Persistent` 代理模式。
+- 可选启用 TUN、设置经过确认的 MTU 或阻断 QUIC。
+- 支持先生成本机文件而不部署；每次正式部署前创建独立时间戳快照，失败时自动回滚。
+- 恢复时既能还原原文件，也能删除部署前不存在、由部署创建的文件。
 
----
-
-## 👥 什么样的人适合这个项目？
-
-* **多设备协同开发者**：拥有多台 Windows 开发机，需要让所有设备的 Clash 客户端配置、端口和分流规则保持绝对一致的开发者。
-* **WSL2 原生环境重度用户**：在 Windows 11 下使用 WSL2（特别是启用了镜像网络模式 `networkingMode=mirrored`）进行日常开发，遇到过由于 MTU 不匹配导致 WSL 内部无法访问外网或 TLS 握手超时的用户。
-* **智能体及现代工具链使用者**：使用如 Antigravity CLI、Codex 等本地开发工具，经常遇到命令行回听端口（localhost）或进程间本地回环 gRPC 通信被 Clash 代理误拦截而导致工具无限挂起卡死的用户。
-* **网络延迟与效率追求者**：希望最大化利用 Fake-IP 模式性能，避开国内 DNS 污染与高解析延迟，并免去手动配置代理的进阶用户。
-
----
-
-## 💻 完整安装本项目所需要的环境
-
-为确保本同步脚本及规则能 100% 顺利执行，您的目标电脑需要满足以下环境要求：
-
-* **操作系统**：Windows 10 或 Windows 11（64位系统）。
-* **命令行环境**：PowerShell 5.1 或以上（推荐使用 PowerShell 7）。
-* **执行特权**：运行部署和还原批处理需要拥有本地 **Administrator（管理员）** 运行特权，以便执行网卡设置检测、目录读写以及自动安装动作。
-* **包管理器支持**：系统需支持并能正常调用 Windows 原生包管理器 `winget`（Windows 10/11 通常默认自带，用于在未安装客户端时进行静默部署）。
-* **基本网络状态**：目标电脑需处于物理网络连通状态（以便拉取软件或同步最新规则）。
-
----
-
-## 📂 文件结构与内容说明
+## 文件结构
 
 ```text
-ClashVergeSync/
-├── ConfigBackup/
-│   ├── verge.yaml          # 已脱敏的系统全局运行配置
-│   └── Merge.yaml          # 优化的全局覆写分流规则与 DNS/TUN 参数
-├── Deploy-ClashVerge.ps1   # 核心部署、同步与恢复 PowerShell 脚本
-├── 双击一键统一部署.bat      # 管理员提权部署引导批处理
-├── 双击一键还原配置.bat      # 管理员提权还原引导批处理 (快速恢复防线)
-└── README.md               # 本说明文档
+.
+├── ConfigBackup
+│   ├── Merge.yaml                 # 带 __PROXY_GROUP__ 的公开 Merge 模板
+│   ├── Merge.local.example.yaml   # 私有规则示例
+│   ├── Academic.domains.txt       # 学术 PDF/CDN 最小域名清单
+│   ├── Gemini.domains.txt         # Gemini/Google AI 域名规则定义
+│   ├── Microsoft.domains.txt      # 微软登录、商店控制面和应用服务
+│   ├── Microsoft.Download.domains.txt # 商店、系统更新和大型下载
+│   ├── OpenAI.domains.txt         # OpenAI/ChatGPT/Codex 域名规则定义
+│   └── verge.yaml                 # GUI 顶层字段变更说明
+├── docs
+│   └── 本机配置优化建议.md          # 当前电脑建议，仅供参考，不自动执行
+├── Deploy-ClashVerge.ps1          # Audit / Deploy / Restore 主脚本
+├── Set-PowerShellProxy.ps1         # PowerShell 会话/用户级代理助手
+├── 双击一键统一部署.bat             # 实际只启动只读审计
+├── 双击一键还原配置.bat             # 恢复最近一次部署快照
+└── .gitignore                     # 排除本机配置和隐私数据
 ```
 
----
+真实订阅、节点、私有域名、本机生成配置和部署快照不得提交到 GitHub。
 
-## 🚀 跨电脑部署使用流程
+## 使用方法
 
-1. **拷贝文件**：将 `ClashVergeSync` 整个文件夹拷贝到目标电脑。
-2. **运行部署**：右键点击 **`双击一键统一部署.bat`**，选择 **“以管理员身份运行”**，等待脚本全自动运行并重启客户端。
-3. **导入订阅**：在重启后的 Clash Verge 界面中，点击 **“配置 (Profiles)”**，手动贴入您个人的订阅链接进行导入，并左键选中。
-4. **启用合并模式**：右键点击该订阅卡片，选择配置合并为 **“Merge”** 模式，再次右键选择 **“刷新/重新加载 (Refresh)”** 以合入全局覆写规则。
-5. **应急恢复**：如果在部署后遇到任何不兼容或意外情况，只需右键点击 **`双击一键还原配置.bat`** 选择 **“以管理员身份运行”**，即可在 1 秒内将本机无损还原到部署前状态。
+### 1. 只读审计（默认）
 
----
+```powershell
+.\Deploy-ClashVerge.ps1
+# 等价于：
+.\Deploy-ClashVerge.ps1 -Action Audit
+```
 
-## 🤖 Agent 自动部署与安全审计专用 Prompt
+审计会显示检测到的程序路径、Mihomo 路径、配置目录、策略组和 Merge 绑定状态，不修改文件。
 
-> [!TIP]
-> 这是一个专门为 **Vibe Coding（AI 编码助手，如 Antigravity、Cline、Claude Dev 等）** 设计的高阶指令提示词。
-> 您可以直接点击下方代码文本框右上角的 **Copy（复制）** 按钮，将其一键复制并直接发送给您的 AI 助理，它便会自动在目标电脑上拉取本项目、客观评估安全性、并全自动执行配置统一部署与回滚测试，完成快速无感部署。
+如需同时测试 OpenAI、Gemini 和 Microsoft Store 公共端点：
 
-````markdown
-我需要你帮我拉取 GitHub 上的 https://github.com/timothydeng233-web/DDDD_clash_verge_config_script.git 项目，阅读项目说明，帮我完成本机 Clash Verge Rev 的配置文件更新与网络优化部署。具体执行规范如下：
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Test
+```
 
-1. **拉取项目并定位目录**：
-   * 请主动在本地工作区目录中使用 Git 命令克隆本项目：
-     `git clone https://github.com/timothydeng233-web/DDDD_clash_verge_config_script.git`
-   * 克隆完成后，请将你的执行终端目录切换定位到 `DDDD_clash_verge_config_script` 文件夹中。
+该测试不读取账号或 API Key，只检查 TLS、HTTP 响应和连接耗时。HTTP 401、403 或 404 仍可能表示网络连接成功，应结合脚本输出判断。
 
-2. **独立安全审计 (Security Audit)**：
-   * 请立即阅读并核对本项目 `Deploy-ClashVerge.ps1` 和 `ConfigBackup/` 目录下的 `verge.yaml`、`Merge.yaml` 物理文件内容。
-   * **安全审计红线指标**：
-     * **隐私泄露评估**：确保脚本与配置文件中不含有任何前人硬编码的真实订阅链接（`url: "https://..."`）、不含有任何 API 密钥、以及任何属于原作者个人的隐私物理路径。
-     * **网络安全性评估**：确保 `Merge.yaml` 中的分流规则无恶意重定向，`Deploy-ClashVerge.ps1` 中无恶意网络外连、越权进程拉起或特权修改行为。
-     * **可还原性评估**：检查是否具备充分的退回与还原机制（必须确认脚本中包含向原配置 `verge.yaml.bak` 的备份写入逻辑，且支持通过 `-Restore` 开关进行无损回滚还原）。
+修改项目模板或准备部署前，应优先运行临时隔离测试：
 
-3. **智能决策与自动化部署 (Deployment Execution)**：
-   * 如果上述安全审计红线指标**全部通过**（风险属于极其合理的系统优化范畴，且具备完善的回滚恢复手段）：
-     * 请使用你的运行命令行工具，以**管理员身份**启动并执行目录下的 `Deploy-ClashVerge.ps1` 脚本（或直接双击拉起 `双击一键统一部署.bat`）。
-     * 执行完毕后，请在当前电脑的 Clash Verge Rev 客户端中指引我手动导入我自己的订阅链接，并在订阅卡片上右键开启 `Merge` 合并模式，重载配置。
-   * 如果审计发现任何红线不满足（如发现泄露或安全漏洞），请**立即中断执行**，并用加粗的警告文本向我报告具体的漏洞发现。
-````
+```powershell
+.\Deploy-ClashVerge.ps1 -Action IsolatedTest -ProxyGroup "🔰 选择节点"
+```
+
+该操作在系统临时目录生成配置，拒绝可能覆盖订阅节点的顶层 `proxies`、`proxy-providers`、`proxy-groups` 或 `rules`，检查未替换占位符，调用 Mihomo 校验，并确认测试前后本机运行配置哈希一致。临时文件会自动删除。
+
+PowerShell 默认依赖 TUN。个别工具需要显式代理时，只为当前终端启用：
+
+```powershell
+. .\Set-PowerShellProxy.ps1 -Action Enable
+. .\Set-PowerShellProxy.ps1 -Action Disable
+```
+
+自定义安装或配置目录可以显式传入：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Audit `
+  -InstallPath "D:\Apps\Clash Verge\clash-verge.exe" `
+  -ConfigDir "$env:APPDATA\io.github.clash-verge-rev.clash-verge-rev"
+```
+
+### 2. 经 Codex 确认后部署
+
+可以先生成并校验到被 Git 忽略的 `LocalConfig`，完全不修改 Clash Verge：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Generate -ProxyGroup "🔰 选择节点"
+```
+
+默认行为是 Gemini 复用主策略组，微软账号、商店、应用服务和大型下载均使用 `DIRECT`：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Generate `
+  -ProxyGroup "🔰 选择节点" `
+  -GeminiGroup "✨ Gemini" `
+  -AcademicGroup DIRECT `
+  -MicrosoftGroup DIRECT `
+  -MicrosoftDownloadGroup DIRECT
+```
+
+只有目标网络无法直连微软下载端点时，才把 `-MicrosoftDownloadGroup` 改为真实存在的代理组。大型商店应用和系统更新会消耗较多代理流量。
+
+确认生成结果后再部署：
+
+保留本机 TUN 和 MTU，仅部署基础规则：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Deploy -ProxyGroup "🔰 选择节点"
+```
+
+明确启用 TUN，并在确认路径 MTU 后设置 1500：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Deploy `
+  -ProxyGroup "🔰 选择节点" `
+  -TunMode Enable `
+  -TunMtu 1500
+```
+
+需要阻断 UDP/443（包括 QUIC）时才使用：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Deploy `
+  -ProxyGroup "🔰 选择节点" `
+  -BlockQuic Enable
+```
+
+未安装客户端时允许脚本通过 WinGet 安装：
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Deploy -InstallIfMissing
+```
+
+如果当前订阅未绑定默认 `Merge`，脚本会警告。此时需要在 Clash Verge Rev 中为订阅选择 `Merge`，然后刷新订阅。
+
+### 3. 恢复
+
+```powershell
+.\Deploy-ClashVerge.ps1 -Action Restore
+```
+
+快照保存在目标配置目录的 `codex-deployment-backups` 中，不在 Git 仓库内。恢复默认选择最新快照。
+
+## 参数
+
+| 参数 | 含义 |
+|---|---|
+| `-Action Audit` | 只读检测，默认行为 |
+| `-Action Test` | 只读审计并测试 OpenAI、Gemini、Microsoft 和学术网站公共端点 |
+| `-Action IsolatedTest` | 在临时目录生成并校验配置、执行连通测试，不部署或重载客户端 |
+| `-Action Generate` | 生成并验证到 `LocalConfig`，不部署 |
+| `-Action Deploy` | 生成、验证并部署本机适配配置 |
+| `-Action Restore` | 恢复最近一次部署快照 |
+| `-InstallPath` | 显式指定 `clash-verge.exe` |
+| `-ConfigDir` | 显式指定用户配置目录 |
+| `-ProxyGroup` | 指定订阅中真实存在的策略组 |
+| `-GeminiGroup` | Gemini 策略组；省略时复用主策略组 |
+| `-AcademicGroup` | ScienceDirect PDF/Elsevier CDN 出口，默认 `DIRECT`；可指定本机真实存在的校园策略组 |
+| `-MicrosoftGroup` | 微软登录、商店控制面和应用服务出口，默认 `DIRECT` |
+| `-MicrosoftDownloadGroup` | 商店/Windows Update 下载出口，默认 `DIRECT` |
+| `-OutputDirectory` | 指定 `Generate` 输出目录 |
+| `-TunMode Auto/Enable/Disable` | 保留、启用或禁用 TUN |
+| `-TunMtu 0..9000` | `0` 表示不覆盖；其他值必须经过本机检测 |
+| `-MixedPort 0..65535` | `0` 保留本机端口；非零值才显式覆盖 |
+| `-BlockQuic Auto/Enable/Disable` | 默认不增加阻断规则；`Enable` 阻断 UDP/443 |
+| `-InstallIfMissing` | 找不到客户端时允许 WinGet 安装 |
+| `-SkipOpenAiRules` | 生成时不加入项目维护的 OpenAI 域名规则 |
+| `-SkipGeminiRules` | 生成时不加入 Gemini 域名规则 |
+| `-SkipAcademicRules` | 生成时不加入项目维护的学术 PDF/CDN 规则 |
+| `-SkipMicrosoftRules` | 生成时不加入微软控制与下载规则 |
+
+## Codex 执行规范
+
+将下面的提示词提供给目标电脑上的 Codex：
+
+```markdown
+请审计此 Clash Verge Rev 配置模板，并根据本机实际环境完成适配。
+
+必须遵守：
+
+1. 首先运行 `Deploy-ClashVerge.ps1 -Action Audit`，只读检查程序、配置、Mihomo、策略组、OpenAI/Gemini/Microsoft 路由、Microsoft Store 服务和 Merge 绑定状态。
+2. 修改模板、测试新规则或准备部署前，必须优先运行 `-Action IsolatedTest`。只有隔离生成、Mihomo 校验、危险顶层字段检查和本机配置哈希检查全部通过，才能考虑部署。单纯排查现有网络时可运行只读 `-Action Test`。
+3. 不得假设安装在 C 盘。自动检测失败时，根据本机注册表和正在运行的进程确定路径，再通过 `-InstallPath` 或 `-ConfigDir` 显式传入。
+4. 检查仓库中不存在订阅 URL、节点、Token、密码、API Key、私有物理路径和不应公开的域名。发现隐私数据时停止部署。
+5. 从本机最终生成的 `clash-verge.yaml` 获取 `proxy-groups[].name`。部署前必须保证 Merge 中每个规则目标都真实存在；无法唯一判断时询问用户，不得猜测。
+6. 默认保留本机 TUN、MTU 和 QUIC 行为。只有用户明确要求，或检测结果能够证明有必要时，才传入 `-TunMode Enable`、`-TunMtu` 或 `-BlockQuic Enable`。
+7. 设置 MTU 前检查 Windows 出口网卡、TUN 网卡、WSL 网络模式和实际路径 MTU。不得把 1500 当成所有电脑的固定值。
+8. 不要把整个浏览器、PowerShell、VS Code、Codex、WebView2 或 Microsoft Store 进程强制代理。本地回环和私有网段应使用目标地址直连规则。
+9. 部署必须通过 `-Action Deploy` 执行，让脚本再次在临时目录完成隔离预检，再创建时间戳快照、安装文件并在失败时回滚。不要绕过快照直接覆盖 AppData 文件。
+10. 部署后确认 Clash Verge Rev 保持运行，并提醒用户确认当前订阅已经绑定 `Merge` 后刷新。
+11. 不得把目标电脑生成的配置、快照、订阅或私有规则提交到 GitHub。
+12. `ConfigBackup/*.domains.txt` 是各服务网络依赖的规则来源；更新时必须重新执行 Audit、IsolatedTest 和 Test。
+13. 校外访问 ScienceDirect 时，正文和机构认证可继续由 EasyConnect 接管；PDF 与 Elsevier CDN 默认 `DIRECT`，也可用 `-AcademicGroup` 指向目标电脑真实存在的校园策略组，但不得猜测组名。实际 PDF 成功率仍需在已登录浏览器中低频验证，避免连续刷新触发风控。
+14. ScienceDirect 出现“未能加载 PDF”时，先比较普通窗口、无痕窗口和临时停用 Adobe Acrobat 扩展后的结果。不得在没有 A/B 证据时先改 MTU、TUN、DNS 或 QUIC，也不得记录带 `X-Amz-*` 参数的签名 PDF 地址。
+15. Microsoft Store/Windows Update 下载默认 `DIRECT`。除非本机测试证明直连失败，不要让大型下载占用代理节点。
+```
+
+## 设计说明
+
+- `profile.block-quic` 不是 Mihomo 通用配置项，因此已经移除。可选 QUIC 阻断通过明确的 UDP/443 规则完成。
+- `dns.listen` 不再强制设置为 `0.0.0.0:53`，避免无必要的局域网监听和端口冲突。
+- MTU 默认不覆盖。`mixed` TUN 栈保留为模板建议，但仍应由 Codex 根据目标机器检查。
+- 默认规则不包含任何作者私有域名。私有规则应写入被 `.gitignore` 排除的 `*.local.yaml`，由 Codex 在本机合并。
+- OpenAI 域名规则从独立清单生成，避免模板、审计逻辑和建议文档各自维护不同版本。
+- Microsoft 官方说明 Store/Windows Update 依赖账号认证、许可证、目录、更新与 Delivery Optimization 多组端点，因此项目将控制链路和下载链路分开管理：[Windows 11 端点](https://learn.microsoft.com/en-us/windows/privacy/manage-windows-11-endpoints)、[Delivery Optimization](https://learn.microsoft.com/en-us/windows/deployment/do/waas-delivery-optimization-faq)。
+- 下载规则支持 TCP 80/443 的域名分流；不代理局域网 P2P 端口 7680，也不改变 Delivery Optimization 或 Windows Update 服务配置。

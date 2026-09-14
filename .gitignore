@@ -1,0 +1,7 @@
+# 本机生成配置、部署快照和隐私数据不得上传到 GitHub
+LocalConfig/
+Backups/
+*.local.yaml
+*.deployment.yaml
+*.pending-*
+ConfigBackup/*.bak*
