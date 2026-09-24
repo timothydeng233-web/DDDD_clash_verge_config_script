@@ -15,6 +15,8 @@ param (
     [string]$Action = "Audit",
     [string]$InstallPath,
     [string]$ConfigDir,
+    [string]$SnapshotPath,
+    [string]$TargetSubscription = "ikuuu",
     [string]$ProxyGroup,
     [string]$GeminiGroup,
     [string]$AcademicGroup = "DIRECT",
@@ -40,6 +42,7 @@ param (
 $ErrorActionPreference = "Stop"
 $WingetPackageId = "ClashVergeRev.ClashVergeRev"
 $MergeTemplatePath = Join-Path (Join-Path $PSScriptRoot "ConfigBackup") "Merge.yaml"
+$ScriptTemplatePath = Join-Path (Join-Path $PSScriptRoot "ConfigBackup") "Script.js.template"
 $OpenAiDomainsPath = Join-Path (Join-Path $PSScriptRoot "ConfigBackup") "OpenAI.domains.txt"
 $GeminiDomainsPath = Join-Path (Join-Path $PSScriptRoot "ConfigBackup") "Gemini.domains.txt"
 $AcademicDomainsPath = Join-Path (Join-Path $PSScriptRoot "ConfigBackup") "Academic.domains.txt"
@@ -97,11 +100,13 @@ function Find-ConfigDirectory {
     param([string]$PreferredDirectory)
     $candidates = @()
     if ($PreferredDirectory) { $candidates += $PreferredDirectory }
-    $candidates += @(
-        (Join-Path $env:APPDATA "io.github.clash-verge-rev.clash-verge-rev"),
-        (Join-Path $env:APPDATA "clash-verge-rev"),
-        (Join-Path $env:USERPROFILE ".config\clash-verge-rev")
-    )
+    else {
+        $candidates += @(
+            (Join-Path $env:APPDATA "io.github.clash-verge-rev.clash-verge-rev"),
+            (Join-Path $env:APPDATA "clash-verge-rev"),
+            (Join-Path $env:USERPROFILE ".config\clash-verge-rev")
+        )
+    }
     foreach ($candidate in ($candidates | Select-Object -Unique)) {
         $resolved = Resolve-NormalizedPath $candidate
         if (-not $resolved) { continue }
@@ -455,7 +460,9 @@ function Set-TopLevelYamlScalar {
 function New-LocalConfiguration {
     param(
         [Parameter(Mandatory = $true)][string]$CurrentVergePath,
-        [Parameter(Mandatory = $true)][string]$TemplatePath,
+        [Parameter(Mandatory = $true)][string]$MergeTemplatePath,
+        [Parameter(Mandatory = $true)][string]$ScriptTemplatePath,
+        [Parameter(Mandatory = $true)][string]$TargetSubscriptionName,
         [Parameter(Mandatory = $true)][string]$SelectedProxyGroup,
         [Parameter(Mandatory = $true)][string]$SelectedGeminiGroup,
         [Parameter(Mandatory = $true)][string]$SelectedAcademicGroup,
@@ -473,47 +480,9 @@ function New-LocalConfiguration {
     $generatedVerge = Join-Path $OutputDirectory "verge.yaml"
     [IO.File]::WriteAllText($generatedVerge, $verge, (New-Object Text.UTF8Encoding($false)))
 
-    $merge = Get-Content -LiteralPath $TemplatePath -Raw -Encoding UTF8
-    if ($merge -notmatch [regex]::Escape('__PROXY_GROUP__')) { throw "Merge 模板缺少 __PROXY_GROUP__ 占位符。" }
-    $merge = $merge.Replace('__PROXY_GROUP__', $SelectedProxyGroup)
-    $openAiLines = "  # OpenAI rules disabled by -SkipOpenAiRules"
-    if (-not $SkipOpenAiRules) {
-        $openAiLines = @(
-            Get-DomainRuleDefinitions $OpenAiDomainsPath "OpenAI" |
-                ForEach-Object { "  - $($_.Type),$($_.Domain),$SelectedProxyGroup" }
-        ) -join [Environment]::NewLine
-    }
-    $merge = $merge.Replace('  # __OPENAI_RULES__', $openAiLines)
-    $geminiLines = "  # Gemini rules disabled by -SkipGeminiRules"
-    if (-not $SkipGeminiRules) {
-        $geminiLines = @(
-            Get-DomainRuleDefinitions $GeminiDomainsPath "Gemini" |
-                ForEach-Object { "  - $($_.Type),$($_.Domain),$SelectedGeminiGroup" }
-        ) -join [Environment]::NewLine
-    }
-    $merge = $merge.Replace('  # __GEMINI_RULES__', $geminiLines)
-    $academicLines = "  # Academic rules disabled by -SkipAcademicRules"
-    if (-not $SkipAcademicRules) {
-        $academicLines = @(
-            Get-DomainRuleDefinitions $AcademicDomainsPath "Academic" |
-                ForEach-Object { "  - $($_.Type),$($_.Domain),$SelectedAcademicGroup" }
-        ) -join [Environment]::NewLine
-    }
-    $merge = $merge.Replace('  # __ACADEMIC_RULES__', $academicLines)
-    $microsoftLines = "  # Microsoft rules disabled by -SkipMicrosoftRules"
-    $microsoftDownloadLines = "  # Microsoft download rules disabled by -SkipMicrosoftRules"
-    if (-not $SkipMicrosoftRules) {
-        $microsoftLines = @(
-            Get-DomainRuleDefinitions $MicrosoftDomainsPath "Microsoft" |
-                ForEach-Object { "  - $($_.Type),$($_.Domain),$SelectedMicrosoftGroup" }
-        ) -join [Environment]::NewLine
-        $microsoftDownloadLines = @(
-            Get-DomainRuleDefinitions $MicrosoftDownloadDomainsPath "Microsoft Download" |
-                ForEach-Object { "  - $($_.Type),$($_.Domain),$SelectedMicrosoftDownloadGroup" }
-        ) -join [Environment]::NewLine
-    }
-    $merge = $merge.Replace('  # __MICROSOFT_RULES__', $microsoftLines)
-    $merge = $merge.Replace('  # __MICROSOFT_DOWNLOAD_RULES__', $microsoftDownloadLines)
+    # 1. 生成全局通用纯净 Merge.yaml (仅保留纯直连/无代理组依赖的规则，跨所有订阅完全安全)
+    $merge = Get-Content -LiteralPath $MergeTemplatePath -Raw -Encoding UTF8
+    $merge = $merge.Replace('  # __ACADEMIC_RULES__', '  # 学术站点规则由目标订阅的 Script.js 处理')
     $tunBlock = "# TUN 配置保留客户端/订阅现值"
     if ($TunMode -ne "Auto" -or $TunMtu -gt 0) {
         $tunLines = @("tun:")
@@ -529,7 +498,89 @@ function New-LocalConfiguration {
     $merge = $merge.Replace('  # __BLOCK_QUIC_RULE__', $quicLine)
     $generatedMerge = Join-Path $OutputDirectory "Merge.yaml"
     [IO.File]::WriteAllText($generatedMerge, $merge, (New-Object Text.UTF8Encoding($false)))
-    return [pscustomobject]@{ Verge = $generatedVerge; Merge = $generatedMerge }
+
+    # 2. 为目标订阅生成独立规则；字符串按 JSON 转义后才写入 JavaScript。
+    $script = Get-Content -LiteralPath $ScriptTemplatePath -Raw -Encoding UTF8
+    $script = $script.Replace('__TARGET_SUBSCRIPTION__', (ConvertTo-Json -InputObject $TargetSubscriptionName -Compress))
+    $requiredGroups = @($SelectedProxyGroup, $SelectedGeminiGroup, $SelectedAcademicGroup,
+        $SelectedMicrosoftGroup, $SelectedMicrosoftDownloadGroup) | Select-Object -Unique
+    $script = $script.Replace('__REQUIRED_GROUPS__', (ConvertTo-Json -InputObject @($requiredGroups) -Compress))
+
+    $dynamicRules = New-Object System.Collections.Generic.List[string]
+    foreach ($domain in @('github.com', 'githubusercontent.com', 'githubassets.com',
+            'githubcopilot.com', 'vscode-cdn.net', 'visualstudio.com', 'open-vsx.org')) {
+        $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "DOMAIN-SUFFIX,$domain,$SelectedProxyGroup" -Compress))
+    }
+    foreach ($domain in @('update.code.visualstudio.com', 'marketplace.visualstudio.com')) {
+        $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "DOMAIN,$domain,$SelectedProxyGroup" -Compress))
+    }
+    if (-not $SkipAcademicRules) {
+        Get-DomainRuleDefinitions $AcademicDomainsPath "Academic" | ForEach-Object {
+            $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "$($_.Type),$($_.Domain),$SelectedAcademicGroup" -Compress))
+        }
+    }
+    if (-not $SkipGeminiRules) {
+        foreach ($domain in @('google.com', 'google.com.hk', 'googleapis.com', 'gstatic.com',
+                'googleusercontent.com', 'google.dev', 'ggpht.com', '1e100.net',
+                'antigravity.google', 'gvt1.com')) {
+            $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "DOMAIN-SUFFIX,$domain,$SelectedGeminiGroup" -Compress))
+        }
+        Get-DomainRuleDefinitions $GeminiDomainsPath "Gemini" | ForEach-Object {
+            $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "$($_.Type),$($_.Domain),$SelectedGeminiGroup" -Compress))
+        }
+    }
+    if (-not $SkipOpenAiRules) {
+        Get-DomainRuleDefinitions $OpenAiDomainsPath "OpenAI" | ForEach-Object {
+            $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "$($_.Type),$($_.Domain),$SelectedProxyGroup" -Compress))
+        }
+    }
+    if (-not $SkipMicrosoftRules) {
+        Get-DomainRuleDefinitions $MicrosoftDomainsPath "Microsoft" | ForEach-Object {
+            $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "$($_.Type),$($_.Domain),$SelectedMicrosoftGroup" -Compress))
+        }
+        Get-DomainRuleDefinitions $MicrosoftDownloadDomainsPath "Microsoft Download" | ForEach-Object {
+            $dynamicRules.Add('    ' + (ConvertTo-Json -InputObject "$($_.Type),$($_.Domain),$SelectedMicrosoftDownloadGroup" -Compress))
+        }
+    }
+    $dynamicRulesText = $dynamicRules -join (',' + [Environment]::NewLine)
+    $script = $script.Replace('    // __DYNAMIC_RULES__', $dynamicRulesText)
+    $generatedScript = Join-Path $OutputDirectory "Script.js"
+    [IO.File]::WriteAllText($generatedScript, $script, (New-Object Text.UTF8Encoding($false)))
+
+    return [pscustomobject]@{ Verge = $generatedVerge; Merge = $generatedMerge; Script = $generatedScript }
+}
+
+function Test-ScriptSafetyAndRules {
+    param(
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedSubscription,
+        [Parameter(Mandatory = $true)][string]$ExpectedGroup
+    )
+    $text = Get-Content -LiteralPath $ScriptPath -Raw -Encoding UTF8
+    if ($text -match '__[A-Z0-9_]+__') {
+        throw "隔离安全检查失败：生成的 Script.js 仍包含未替换占位符 '$($Matches[0])'。"
+    }
+    $expectedName = ConvertTo-Json -InputObject $ExpectedSubscription -Compress
+    if (-not $text.Contains("profileName !== $expectedName")) {
+        throw "隔离安全检查失败：生成的 Script.js 缺少针对订阅 '$ExpectedSubscription' 的守卫分支。"
+    }
+    if (-not $text.Contains((ConvertTo-Json -InputObject $ExpectedGroup -Compress).Trim('"'))) {
+        throw "隔离安全检查失败：生成的 Script.js 未包含目标策略组 '$ExpectedGroup'。"
+    }
+    $forbiddenProcessRules = @(
+        "Code.exe",
+        "Code - Insiders.exe",
+        "Codex.exe",
+        "codex.exe",
+        "msedgewebview2.exe",
+        "chrome.exe",
+        "msedge.exe"
+    )
+    foreach ($processName in $forbiddenProcessRules) {
+        if ($text -match [regex]::Escape("PROCESS-NAME,$processName,")) {
+            throw "隔离安全检查失败：通用浏览器或开发工具不得整进程代理：$processName"
+        }
+    }
 }
 
 function Test-RuleTargets {
@@ -567,7 +618,7 @@ function Test-IsolatedMergeSafety {
 function Get-ConfigurationFingerprint {
     param([Parameter(Mandatory = $true)][string]$Root)
     $result = @{}
-    foreach ($relativePath in @("verge.yaml", "profiles\Merge.yaml", "profiles.yaml", "clash-verge.yaml")) {
+    foreach ($relativePath in @("verge.yaml", "profiles\Merge.yaml", "profiles\Script.js", "profiles.yaml", "clash-verge.yaml")) {
         $path = Join-Path $Root $relativePath
         $result[$relativePath] = if (Test-Path -LiteralPath $path -PathType Leaf) {
             (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
@@ -590,7 +641,7 @@ function Assert-ConfigurationFingerprintUnchanged {
 
 function Test-YamlWithMihomo {
     param([string]$MihomoPath, [Parameter(Mandatory = $true)][string]$ConfigPath)
-    if (-not $MihomoPath) { Write-Warning "未找到 verge-mihomo.exe，只完成文本级检查。"; return }
+    if (-not $MihomoPath) { throw "未找到 verge-mihomo.exe，无法完成内核校验。" }
     & $MihomoPath -t -f $ConfigPath
     if ($LASTEXITCODE -ne 0) { throw "Mihomo 配置校验失败: $ConfigPath" }
 }
@@ -605,7 +656,7 @@ function New-DeploymentSnapshot {
     $snapshot = Join-Path (Join-Path $Root "codex-deployment-backups") (Get-Date -Format "yyyyMMdd-HHmmss-fff")
     New-Item -ItemType Directory -Path $snapshot -Force | Out-Null
     $entries = @()
-    foreach ($relative in @("verge.yaml", "profiles\Merge.yaml", "profiles.yaml")) {
+    foreach ($relative in @("verge.yaml", "profiles\Merge.yaml", "profiles\Script.js", "profiles.yaml")) {
         $source = Join-Path $Root $relative
         $exists = Test-Path -LiteralPath $source -PathType Leaf
         $hash = $null
@@ -633,9 +684,20 @@ function Install-FileAtomically {
     $parent = Split-Path -Parent $Destination
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $pending = Join-Path $parent ((Split-Path -Leaf $Destination) + ".pending-" + [guid]::NewGuid().ToString("N"))
+    $replaceBackup = Join-Path $parent ((Split-Path -Leaf $Destination) + ".replace-backup-" + [guid]::NewGuid().ToString("N"))
     Copy-Item -LiteralPath $Source -Destination $pending -Force
-    if (Test-Path -LiteralPath $Destination) { [IO.File]::Replace($pending, $Destination, $null) }
-    else { Move-Item -LiteralPath $pending -Destination $Destination }
+    try {
+        if (Test-Path -LiteralPath $Destination) {
+            # Windows PowerShell 5.1 may reject a null backup path for File.Replace.
+            # Use an explicit same-volume backup name to preserve atomic replacement.
+            [IO.File]::Replace($pending, $Destination, $replaceBackup)
+        } else {
+            Move-Item -LiteralPath $pending -Destination $Destination
+        }
+    } finally {
+        Remove-Item -LiteralPath $pending -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $replaceBackup -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Restore-Snapshot {
@@ -649,7 +711,7 @@ function Restore-Snapshot {
     if (-not (Test-Path -LiteralPath $manifestPath)) { throw "快照缺少 manifest.json: $SnapshotPath" }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Stop-ClashVerge
-    $allowed = @("verge.yaml", "profiles\Merge.yaml", "profiles.yaml")
+    $allowed = @("verge.yaml", "profiles\Merge.yaml", "profiles\Script.js", "profiles.yaml")
     foreach ($entry in $manifest.files) {
         if ($allowed -notcontains [string]$entry.relativePath) { continue }
         $destination = Join-Path $Root ([string]$entry.relativePath)
@@ -773,7 +835,7 @@ if (-not $configRoot) { throw "未检测到配置目录；请先启动一次客�
 if ($Action -eq "Restore") {
     $restored = $null
     try {
-        $restored = Restore-Snapshot $configRoot
+        $restored = Restore-Snapshot $configRoot $SnapshotPath
     } finally {
         Start-Process -FilePath $app.ExePath | Out-Null
     }
@@ -802,33 +864,11 @@ if ($keepGeneratedFiles) {
 }
 $isolationFingerprint = Get-ConfigurationFingerprint $configRoot
 try {
-    $generatedFiles = New-LocalConfiguration $currentVerge $MergeTemplatePath $selectedGroup $selectedGeminiGroup $selectedAcademicGroup `
-        $selectedMicrosoftGroup $selectedMicrosoftDownloadGroup $staging
+    $generatedFiles = New-LocalConfiguration $currentVerge $MergeTemplatePath $ScriptTemplatePath $TargetSubscription `
+        $selectedGroup $selectedGeminiGroup $selectedAcademicGroup $selectedMicrosoftGroup $selectedMicrosoftDownloadGroup $staging
     Test-RuleTargets $generatedFiles.Merge $groups
-    if (-not $SkipOpenAiRules) {
-        if (@(Test-DomainRouting $generatedFiles.Merge $OpenAiDomainsPath "OpenAI" $selectedGroup).Count -gt 0) {
-            throw "生成配置的 OpenAI 路由校验失败。"
-        }
-    }
-    if (-not $SkipGeminiRules) {
-        if (@(Test-DomainRouting $generatedFiles.Merge $GeminiDomainsPath "Gemini" $selectedGeminiGroup).Count -gt 0) {
-            throw "生成配置的 Gemini 路由校验失败。"
-        }
-    }
-    if (-not $SkipAcademicRules) {
-        if (@(Test-DomainRouting $generatedFiles.Merge $AcademicDomainsPath "Academic" $selectedAcademicGroup).Count -gt 0) {
-            throw "生成配置的 Academic 路由校验失败。"
-        }
-    }
-    if (-not $SkipMicrosoftRules) {
-        if (@(Test-DomainRouting $generatedFiles.Merge $MicrosoftDomainsPath "Microsoft" $selectedMicrosoftGroup).Count -gt 0) {
-            throw "生成配置的 Microsoft 控制链路校验失败。"
-        }
-        if (@(Test-DomainRouting $generatedFiles.Merge $MicrosoftDownloadDomainsPath "Microsoft Download" $selectedMicrosoftDownloadGroup).Count -gt 0) {
-            throw "生成配置的 Microsoft 下载链路校验失败。"
-        }
-    }
     Test-IsolatedMergeSafety $generatedFiles.Merge
+    Test-ScriptSafetyAndRules $generatedFiles.Script $TargetSubscription $selectedGroup
     Test-YamlWithMihomo $app.MihomoPath $generatedFiles.Merge
     Assert-ConfigurationFingerprintUnchanged $isolationFingerprint $configRoot
     Write-Host "[✓] 临时隔离预检通过，本机运行配置未发生变化。" -ForegroundColor Green
@@ -851,6 +891,7 @@ try {
         $snapshot = New-DeploymentSnapshot $configRoot $app
         Install-FileAtomically $generatedFiles.Verge (Join-Path $configRoot "verge.yaml")
         Install-FileAtomically $generatedFiles.Merge (Join-Path $configRoot "profiles\Merge.yaml")
+        Install-FileAtomically $generatedFiles.Script (Join-Path $configRoot "profiles\Script.js")
         Start-Process -FilePath $app.ExePath | Out-Null
         Start-Sleep -Seconds 3
         if (-not (Get-Process -Name "clash-verge" -ErrorAction SilentlyContinue)) { throw "客户端启动后未保持运行。" }
@@ -873,7 +914,9 @@ try {
         throw $deploymentError
     }
     Write-Host "[✓] 本机适配配置已部署。快照: $snapshot" -ForegroundColor Green
+    Write-Host "[✓] 目标订阅规则仅在 profileName 为 '$TargetSubscription' 时注入。" -ForegroundColor Green
     Write-Host "[✓] 使用的代理策略组: $selectedGroup" -ForegroundColor Green
+    Write-Host "[✓] 已安装通用 Merge.yaml 与带订阅守卫的 Script.js。" -ForegroundColor Green
     Write-Host "[✓] Gemini 策略组: $selectedGeminiGroup" -ForegroundColor Green
     Write-Host "[✓] 学术 PDF/CDN 出口: $selectedAcademicGroup" -ForegroundColor Green
     Write-Host "[✓] Microsoft 控制链路: $selectedMicrosoftGroup" -ForegroundColor Green
@@ -883,6 +926,7 @@ try {
         ((Get-Content -LiteralPath $profilesPath -Raw -Encoding UTF8) -notmatch '(?m)^\s+merge\s*:\s*Merge\s*$')) {
         Write-Warning "配置文件已安装，但当前订阅尚未绑定 Merge。请在客户端为订阅选择 Merge 后刷新。"
     }
+    Write-Host "[i] 请在客户端核对目标订阅的 Script 扩展绑定，并刷新订阅。"
 } finally {
     if (-not $keepGeneratedFiles -and (Test-Path -LiteralPath $staging)) {
         Remove-Item -LiteralPath $staging -Recurse -Force

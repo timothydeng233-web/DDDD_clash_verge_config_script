@@ -5,3 +5,7 @@ Backups/
 *.deployment.yaml
 *.pending-*
 ConfigBackup/*.bak*
+
+# 工具运行时产物
+__pycache__/
+*.pyc

@@ -1,4 +1,4 @@
-# Clash Verge Rev Merge 模板；部署脚本会替换 __PROXY_GROUP__。
+# Clash Verge Rev Merge 模板（全局通用，不依赖特定代理组，对所有订阅安全生效）
 prepend-rules:
   - DOMAIN,localhost,DIRECT
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
@@ -6,37 +6,9 @@ prepend-rules:
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
-  # ScienceDirect PDF 与 Elsevier 辅助 CDN 规则由 Academic.domains.txt 生成。
+  # ScienceDirect PDF 与 Elsevier 辅助 CDN 规则（默认 DIRECT）
   # __ACADEMIC_RULES__
   # __BLOCK_QUIC_RULE__
-  # Gemini / Google AI 规则由 Gemini.domains.txt 统一生成
-  # __GEMINI_RULES__
-  - DOMAIN-SUFFIX,google.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,google.com.hk,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,googleapis.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,gstatic.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,googleusercontent.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,google.dev,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,ggpht.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,1e100.net,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,antigravity.google,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,gvt1.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,github.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,githubusercontent.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,githubassets.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,githubcopilot.com,__PROXY_GROUP__
-  - DOMAIN,default.exp-tas.com,__PROXY_GROUP__
-  # OpenAI / ChatGPT / Codex 规则由 OpenAI.domains.txt 统一生成
-  # __OPENAI_RULES__
-  # Microsoft 登录、商店目录与应用服务规则由 Microsoft.domains.txt 生成
-  # __MICROSOFT_RULES__
-  # Microsoft Store / Windows Update 下载默认直连，由 Microsoft.Download.domains.txt 生成
-  # __MICROSOFT_DOWNLOAD_RULES__
-  - DOMAIN-SUFFIX,vscode-cdn.net,__PROXY_GROUP__
-  - DOMAIN,update.code.visualstudio.com,__PROXY_GROUP__
-  - DOMAIN,marketplace.visualstudio.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,visualstudio.com,__PROXY_GROUP__
-  - DOMAIN-SUFFIX,open-vsx.org,__PROXY_GROUP__
 
 profile:
   store-selected: true

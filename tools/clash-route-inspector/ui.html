@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网址路由判定控制台</title>
+<style>
+:root{
+--bg:#f7f7f5;--card:#fff;--line:#e3e2dd;--line2:#cfcec8;
+--tx:#26262a;--tx2:#5f5e5a;--tx3:#8a8981;
+--ok:#0f6e56;--okbg:#e1f5ee;--pr:#185fa5;--prbg:#e6f1fb;
+--rj:#a32d2d;--rjbg:#fcebeb;--wn:#854f0b;--wnbg:#faeeda;
+--gr:#5f5e5a;--grbg:#f1efe8;--acc:#534ab7;--accbg:#eeedfe;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);
+font:14px/1.65 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:26px 22px 72px}
+h1{font-size:21px;font-weight:500;margin:0}
+h2{font-size:15px;font-weight:500;margin:26px 0 12px}
+h3{font-size:13px;font-weight:500;margin:0 0 8px;color:var(--tx2)}
+p{margin:6px 0}
+.mono,code{font:12px/1.55 ui-monospace,Consolas,"Courier New",monospace}
+
+/* 头部 */
+header{display:flex;align-items:flex-start;justify-content:space-between;
+gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.sub{color:var(--tx2);font-size:13px;margin:4px 0 0}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;
+padding:4px 12px;font-size:12px;color:var(--tx2);white-space:nowrap}
+.chip b{font-weight:500;color:var(--tx)}
+.chip.ok{border-color:var(--ok);background:var(--okbg);color:var(--ok)}
+.chip.ok b{color:var(--ok)}
+
+/* 标签页 */
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px}
+nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;
+padding:9px 14px;font:inherit;font-size:13.5px;color:var(--tx2);cursor:pointer;
+border-radius:8px 8px 0 0}
+nav.tabs button:hover{background:var(--grbg);color:var(--tx)}
+nav.tabs button[aria-selected="true"]{color:var(--acc);border-bottom-color:var(--acc);font-weight:500}
+section[hidden]{display:none}
+
+/* 卡片与表单 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:18px 20px;margin-bottom:16px}
+.grid{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.grow{flex:1 1 480px;min-width:280px}
+.side{flex:0 0 210px;display:flex;flex-direction:column;gap:10px}
+label.f{display:block;font-size:12px;color:var(--tx2);margin-bottom:5px}
+textarea,select,input[type=text]{width:100%;background:#fff;color:var(--tx);
+border:1px solid var(--line2);border-radius:9px;padding:10px 12px;font:inherit;font-size:13.5px}
+textarea{min-height:132px;resize:vertical;font:12.5px/1.7 ui-monospace,Consolas,monospace}
+textarea:focus,select:focus,input:focus{outline:2px solid var(--accbg);border-color:var(--acc)}
+button.primary{background:var(--acc);color:#fff;border:none;border-radius:9px;
+padding:11px 18px;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;width:100%}
+button.primary:hover{filter:brightness(1.08)}
+button.primary:disabled{opacity:.55;cursor:default}
+button.ghost{background:var(--card);border:1px solid var(--line2);border-radius:9px;
+padding:8px 12px;font:inherit;font-size:12.5px;color:var(--tx2);cursor:pointer;width:100%}
+button.ghost:hover{background:var(--grbg);color:var(--tx)}
+.hint{font-size:12px;color:var(--tx3);margin-top:8px;line-height:1.7}
+.err{background:var(--rjbg);border:1px solid var(--rj);color:var(--rj);
+border-radius:10px;padding:10px 14px;font-size:13px;margin:12px 0}
+.warn{background:var(--wnbg);border:1px solid var(--wn);color:var(--wn);
+border-radius:10px;padding:10px 14px;font-size:12.5px;margin:10px 0}
+
+/* 徽章 */
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;
+border:1px solid transparent;white-space:nowrap;vertical-align:middle}
+.p-ok{background:var(--okbg);color:var(--ok);border-color:var(--ok)}
+.p-pr{background:var(--prbg);color:var(--pr);border-color:var(--pr)}
+.p-rj{background:var(--rjbg);color:var(--rj);border-color:var(--rj)}
+.p-wn{background:var(--wnbg);color:var(--wn);border-color:var(--wn)}
+.p-gr{background:var(--grbg);color:var(--gr);border-color:var(--gr)}
+
+/* 汇总 */
+.sum{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:14px 18px;margin-bottom:16px}
+.sum .tot{font-size:13px;color:var(--tx2);margin-right:4px}
+.sum button{border:1px solid var(--line2);background:var(--card);border-radius:999px;
+padding:4px 12px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--tx2)}
+.sum button:hover{background:var(--grbg)}
+.sum button.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:500}
+.sum button b{font-weight:500}
+
+/* 结果卡 */
+.res{background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:0;margin-bottom:14px;overflow:hidden}
+.res .hd{display:flex;justify-content:space-between;gap:14px;align-items:center;
+padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.res .u{font:500 15px/1.4 ui-monospace,Consolas,monospace;word-break:break-all}
+.res .mt{font-size:12px;color:var(--tx3);margin-top:3px}
+.sc{display:flex;gap:0;flex-wrap:wrap}
+.sc>div{flex:1 1 320px;padding:13px 18px;border-bottom:1px solid var(--line)}
+.sc>div+div{border-left:1px solid var(--line)}
+.sc .lb{font-size:12px;color:var(--tx3);margin-bottom:7px}
+.sc .rt{font-size:12px;color:var(--tx2);margin-top:7px;line-height:1.7;word-break:break-all}
+.sc .rt code{color:var(--tx)}
+.res details{border-top:1px solid var(--line)}
+.res summary{padding:11px 18px;cursor:pointer;font-size:12.5px;color:var(--tx2);
+background:var(--grbg);list-style:none}
+.res summary::-webkit-details-marker{display:none}
+.res summary:hover{color:var(--tx)}
+.res summary::before{content:"▸ ";color:var(--tx3)}
+.res details[open] summary::before{content:"▾ "}
+.res .bd{padding:4px 18px 16px}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--tx2);font-size:12px;background:var(--grbg);
+position:sticky;top:0}
+tr:last-child td{border-bottom:none}
+td.idx{text-align:right;color:var(--tx3);white-space:nowrap}
+td.mono{font:12px/1.5 ui-monospace,Consolas,monospace;word-break:break-all}
+.tbl{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:10px;
+background:var(--card)}
+.note{font-size:12px;color:var(--tx3);line-height:1.75;margin:8px 0 0}
+.ev{background:var(--grbg);border-radius:9px;padding:9px 12px;
+font:12px/1.7 ui-monospace,Consolas,monospace;word-break:break-all;color:var(--tx2)}
+footer{margin-top:38px;padding-top:16px;border-top:1px solid var(--line);
+font-size:12px;color:var(--tx3);line-height:1.9}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--accbg);
+border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite;
+vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>网址路由判定控制台</h1>
+    <p class="sub">按规则优先级逐条判定：命中哪条规则、走哪条链路、落到哪个节点。只读运行。</p>
+  </div>
+  <div class="chips" id="chips"><span class="chip">加载中…</span></div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="analyze">网址判定</button>
+  <button role="tab" aria-selected="false" data-tab="browsers">浏览器体检</button>
+  <button role="tab" aria-selected="false" data-tab="groups">策略组与规则</button>
+</nav>
+
+<main>
+<section id="tab-analyze">
+  <div class="panel">
+    <div class="grid">
+      <div class="grow">
+        <label class="f" for="urls">网址（每行一个，支持 http/https 链接、裸域名、IP、带端口）</label>
+        <textarea id="urls" spellcheck="false"></textarea>
+      </div>
+      <div class="side">
+        <div>
+          <label class="f" for="proc">入口进程</label>
+          <select id="proc"></select>
+        </div>
+        <button class="primary" id="go">开始判定</button>
+        <button class="ghost" id="samples">填入示例</button>
+        <button class="ghost" id="clear">清空</button>
+      </div>
+    </div>
+    <p class="hint">
+      判定分两个场景：<b>场景 A</b> 用你选择的入口进程；<b>场景 B</b> 模拟一个不在进程规则名单里的浏览器。
+      两者结果不同时，说明进程规则把域名分流短路了。按 <span class="mono">Ctrl + Enter</span> 可直接判定。
+    </p>
+  </div>
+
+  <div id="err"></div>
+  <div id="summary"></div>
+  <div id="results"></div>
+</section>
+
+<section id="tab-browsers" hidden>
+  <div class="panel">
+    <h3>候选浏览器体检</h3>
+    <p class="note">输入进程名，检查它是否会被进程规则接管。可留空只看下方的进程规则清单。</p>
+    <div class="grid" style="margin-top:10px">
+      <div class="grow">
+        <input type="text" id="pcheck" placeholder="例如 firefox.exe / catsxp.exe / brave.exe" spellcheck="false">
+      </div>
+      <div class="side" style="flex:0 0 150px">
+        <button class="primary" id="pgo">检查</button>
+      </div>
+    </div>
+    <div id="presult"></div>
+  </div>
+  <h2>进程规则清单</h2>
+  <p class="note">这些规则排在所有域名规则之前。任何来自名单内进程的连接都会被直接截获，域名规则完全不参与判定。</p>
+  <div class="tbl" style="margin-top:10px"><table id="ptable"></table></div>
+</section>
+
+<section id="tab-groups" hidden>
+  <h2>策略组出口取值</h2>
+  <p class="note">取值优先级：profiles.yaml 的 GUI 选中项 &gt; 内核日志实测 &gt; 组内第一项（推断）。</p>
+  <div class="tbl" style="margin-top:10px"><table id="gtable"></table></div>
+  <h2>规则类型分布</h2>
+  <div class="tbl" style="margin-top:10px"><table id="ttable"></table></div>
+</section>
+</main>
+
+<footer id="foot"></footer>
+</div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+const KIND = {direct:"直连", node:"代理", reject:"拦截", unknown:"不确定"};
+const KLASS = {direct:"p-ok", node:"p-pr", reject:"p-rj", unknown:"p-gr"};
+const SRC = {profiles:"GUI 选中项", log:"日志实测", first:"推断（组内首项）"};
+
+const EXTRA_PROCESSES = [
+  ["firefox.exe","Firefox"], ["catsxp.exe","猫眼 Catsxp"], ["brave.exe","Brave"],
+  ["vivaldi.exe","Vivaldi"], ["opera.exe","Opera"], ["slimjet.exe","Slimjet"],
+  ["360chrome.exe","360 极速"], ["QQBrowser.exe","QQ 浏览器"]
+];
+
+let OVERVIEW = null;
+let RESULTS = [];
+let FILTER = null;
+let SUMM_SCENE = "scoped";   // scoped = 场景 A，any = 场景 B
+
+function outcomeOf(r, scene){
+  if(r.error) return "error";
+  const p = r[scene];
+  if(!p || !p.outcome) return "unknown";
+  return p.outcome.kind === "node" ? "node:" + p.outcome.node : p.outcome.kind;
+}
+
+function labelOf(key){
+  if(key === "error") return "无法解析";
+  if(key.startsWith("node:")) return "代理 " + key.slice(5);
+  return KIND[key] || key;
+}
+
+function clsOf(key){
+  if(key === "direct") return "p-ok";
+  if(key.startsWith("node:")) return "p-pr";
+  if(key === "reject") return "p-rj";
+  return "p-gr";
+}
+
+function pill(o){
+  if(!o) return '<span class="pill p-gr">—</span>';
+  const cls = KLASS[o.kind] || "p-gr";
+  let txt = KIND[o.kind] || "未知";
+  if(o.kind === "node") txt = "代理 " + o.node;
+  return '<span class="pill '+cls+'">'+esc(txt)+'</span>';
+}
+function srcNote(o){
+  if(!o || !o.sources || !o.sources.length) return "";
+  const k = o.sources.includes("first") ? "first"
+          : (o.sources.includes("log") ? "log" : "profiles");
+  return '<span style="color:var(--tx3);font-size:11.5px">（'+esc(SRC[k])+'）</span>';
+}
+function chain(o){
+  if(!o) return "—";
+  const p = (o.path || []).slice();
+  if(o.kind === "node") p.push(o.node);
+  else if(o.kind === "direct") p.push("DIRECT");
+  else if(o.kind === "reject") p.push("REJECT");
+  if(!p.length) return "—";
+  return p.map(x => "<b>"+esc(x)+"</b>").join(" → ");
+}
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({ok:false, error:"响应不是合法 JSON"}));
+  if(!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+/* ---------------- 概览 ---------------- */
+async function loadOverview(){
+  try{
+    const j = await api("/api/overview");
+    OVERVIEW = j.data;
+    renderChips(); renderProcessSelect(); renderProcessTable();
+    renderGroupTable(); renderTypeTable(); renderFoot();
+  }catch(e){
+    $("#chips").innerHTML = '<span class="chip" style="border-color:var(--rj);color:var(--rj)">'
+      + esc(e.message) + '</span>';
+  }
+}
+
+function renderChips(){
+  const d = OVERVIEW, m = d.meta || {};
+  const tun = (m.gui_tun === "true" || m.tun_enable === "true");
+  $("#chips").innerHTML =
+    '<span class="chip">订阅 <b>'+esc(d.profile_name||"未知")+'</b></span>' +
+    '<span class="chip">规则 <b>'+d.rules_count.toLocaleString()+'</b></span>' +
+    '<span class="chip">策略组 <b>'+d.groups_count+'</b></span>' +
+    '<span class="chip">进程规则 <b>'+d.process_rules_count+'</b></span>' +
+    '<span class="chip '+(tun?"ok":"")+'">TUN <b>'+(tun?"已开启":"未开启")+'</b></span>' +
+    '<span class="chip">模式 <b>'+esc(m.mode||"?")+'</b></span>';
+}
+
+const PREFERRED = ["chrome.exe","msedge.exe","msedgewebview2.exe","Code.exe","Codex.exe","Telegram.exe"];
+
+function renderProcessSelect(){
+  const rules = OVERVIEW.process_rules.filter(r => r.type === "PROCESS-NAME");
+  const inList = new Map(rules.map(r => [r.arg, r]));
+  const opts = [];
+  const seen = new Set();
+  const push = (name) => {
+    const r = inList.get(name);
+    if(seen.has(name)) return;
+    seen.add(name);
+    opts.push([name, name + (r ? "  ·  在名单内（第 " + r.index + " 条）" : "  ·  不在名单")]);
+  };
+  PREFERRED.forEach(push);
+  rules.forEach(r => push(r.arg));
+  EXTRA_PROCESSES.forEach(([n]) => push(n));
+  $("#proc").innerHTML = opts
+    .map(([v, t], i) => '<option value="'+esc(v)+'"'+(i===0?" selected":"")+'>'+esc(t)+'</option>')
+    .join("");
+}
+
+function renderProcessTable(){
+  const rows = OVERVIEW.process_rules.map(r =>
+    '<tr><td class="idx">'+r.index+'</td><td class="mono">'+esc(r.arg)+'</td>'+
+    '<td>'+esc(r.target)+'</td><td>'+pill(r.outcome)+srcNote(r.outcome)+'</td></tr>').join("");
+  $("#ptable").innerHTML =
+    '<thead><tr><th class="idx">序号</th><th>进程名</th><th>目标策略组</th><th>最终出口</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody>';
+}
+
+function renderGroupTable(){
+  const rows = OVERVIEW.groups.map(g => {
+    const cls = g.source === "profiles" ? "p-ok" : (g.source === "log" ? "p-pr" : "p-wn");
+    return '<tr><td><b>'+esc(g.group)+'</b></td><td class="mono">'+esc(g.type||"")+'</td>'+
+      '<td><span class="pill '+cls+'">'+esc(SRC[g.source]||g.source)+'</span></td>'+
+      '<td class="mono">'+esc(g.value)+'</td><td>'+pill(g.outcome)+'</td></tr>';
+  }).join("");
+  $("#gtable").innerHTML =
+    '<thead><tr><th>策略组</th><th>类型</th><th>取值来源</th><th>取值</th><th>最终出口</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody>';
+}
+
+function renderTypeTable(){
+  const rows = OVERVIEW.type_counts.map(t =>
+    '<tr><td class="mono">'+esc(t.type)+'</td><td class="idx">'+t.count.toLocaleString()+'</td></tr>').join("");
+  $("#ttable").innerHTML = '<thead><tr><th>规则类型</th><th class="idx">条数</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+function renderFoot(){
+  const d = OVERVIEW, m = d.meta || {};
+  $("#foot").innerHTML =
+    '配置目录 <span class="mono">'+esc(d.config_dir)+'</span><br>'+
+    '运行配置 <span class="mono">'+esc(d.runtime_file)+'</span>（'+d.runtime_size.toLocaleString()+' 字节）'+
+    ' · DNS <span class="mono">'+esc(m.dns_mode||"?")+'</span>'+
+    ' · fake-ip <span class="mono">'+esc(m.fake_ip_range||"?")+'</span>'+
+    ' · TUN 栈 <span class="mono">'+esc(m.tun_stack||"?")+'</span>'+
+    ' · MTU <span class="mono">'+esc(m.tun_mtu||"?")+'</span>'+
+    ' · 混合端口 <span class="mono">'+esc(m.mixed_port||"?")+'</span><br>'+
+    '只读静态推演，不修改、不重载任何 Clash Verge 配置。'+
+    'IP-CIDR / GEOIP 规则依赖真实 DNS 解析，未接入时会在结果中明确标注。';
+}
+
+/* ---------------- 判定 ---------------- */
+function renderSummary(){
+  const groups = new Map();
+  RESULTS.forEach(r => {
+    const k = outcomeOf(r, SUMM_SCENE);
+    if(!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  });
+  const order = ["direct", "reject", "error", "unknown"];
+  const keys = [...groups.keys()].sort((a,b) => {
+    const ia = a.startsWith("node:") ? 1 : order.indexOf(a);
+    const ib = b.startsWith("node:") ? 1 : order.indexOf(b);
+    return (ia<0?9:ia) - (ib<0?9:ib) || a.localeCompare(b);
+  });
+  const chips = keys.map(k =>
+    '<button data-k="'+esc(k)+'" class="'+(FILTER===k?"on":"")+'">'+
+    '<span class="pill '+clsOf(k)+'">'+esc(labelOf(k))+'</span> <b>'+groups.get(k).length+'</b></button>'
+  ).join("");
+  const seg = (v, t) => '<button data-scene="'+v+'" class="'+(SUMM_SCENE===v?"on":"")+'">'+t+'</button>';
+  const unc = RESULTS.filter(r => r.uncertain);
+  const uncResolved = unc.filter(r => r.observed).length;
+  const uncNote = unc.length
+    ? '<span class="tot" style="color:var(--wn)">其中 '+unc.length+' 个静态推演无法确定'+
+      (uncResolved ? '（'+uncResolved+' 个已由日志实测校正）' : '（日志中无记录）')+'</span>'
+    : "";
+  $("#summary").innerHTML =
+    '<div class="sum">'+
+      '<span class="tot">判定 '+RESULTS.length+' 个网址</span>'+
+      '<span style="display:flex;gap:4px;margin-right:6px">'+
+        seg("scoped","按场景 A 统计") + seg("any","按场景 B 统计")+
+      '</span>'+
+      '<button data-k="" class="'+(FILTER===null?"on":"")+'">全部 <b>'+RESULTS.length+'</b></button>'+
+      chips+ uncNote+
+    '</div>';
+  $("#summary").querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      if(b.dataset.scene){ SUMM_SCENE = b.dataset.scene; FILTER = null; }
+      else FILTER = b.dataset.k || null;
+      renderSummary(); renderResults();
+    };
+  });
+}
+
+function renderResults(){
+  const list = RESULTS.filter(r => FILTER === null || outcomeOf(r, SUMM_SCENE) === FILTER);
+  if(!list.length){
+    $("#results").innerHTML = '<div class="panel"><p class="note">没有符合当前筛选的网址。</p></div>';
+    return;
+  }
+  $("#results").innerHTML = list.map(renderCard).join("");
+}
+
+function sceneBox(label, who, pack, procName){
+  if(!pack || !pack.first){
+    return '<div><div class="lb">'+esc(label)+'</div>'+
+      '<div>'+pill(pack && pack.outcome)+'</div>'+
+      '<div class="rt">未命中任何规则</div></div>';
+  }
+  const f = pack.first;
+  let extra = "";
+  if(pack.blocker_count){
+    extra = '<div class="rt" style="color:var(--wn)">命中前有 '+pack.blocker_count+
+      ' 条 IP/GEOIP 规则依赖真实解析，未判定，结论可能与实测有偏差</div>';
+  }
+  return '<div><div class="lb">'+esc(label)+'</div>'+
+    '<div>'+pill(pack.outcome)+srcNote(pack.outcome)+'</div>'+
+    '<div class="rt">入口进程 <span class="mono">'+esc(who)+'</span><br>'+
+    '命中第 <b>'+f.index+'</b> 条<br><code>'+esc(f.raw)+'</code><br>'+
+    '链路 '+chain(pack.outcome)+'</div>'+extra+'</div>';
+}
+
+function renderCard(r){
+  if(r.error){
+    return '<div class="res"><div class="hd"><div><div class="u">'+esc(r.url)+'</div>'+
+      '<div class="mt">'+esc(r.error)+'</div></div>'+
+      '<span class="pill p-rj">无法解析</span></div></div>';
+  }
+  const proc = ($("#proc").value || "chrome.exe");
+  let body =
+    '<div class="sc">'+
+      sceneBox("场景 A · 当前入口进程", proc, r.scoped, proc)+
+      sceneBox("场景 B · 不在进程名单的浏览器", "如 firefox.exe / catsxp.exe", r.any, null)+
+    '</div>';
+
+  if(r.same_outcome){
+    body += '<div style="padding:11px 18px"><div class="warn" style="margin:0">'+
+      '两个场景最终出口相同：进程规则虽然抢跑了，但域名规则指向同一出口。</div></div>';
+  }
+
+  if(r.uncertain){
+    if(r.observed){
+      const o = r.observed;
+      const ok = o.kind === "direct" ? "p-ok" : (o.kind === "reject" ? "p-rj" : "p-pr");
+      const ot = o.kind === "direct" ? "直连 DIRECT"
+               : (o.kind === "reject" ? "拦截 REJECT" : "代理 " + o.node);
+      body += '<div style="padding:12px 18px">'+
+        '<div class="warn" style="background:var(--okbg);border-color:var(--ok);color:var(--ok)">'+
+        '<b>实测结果</b> · 该域名命中过需要真实解析的规则，静态推演无法确定；'+
+        '以下是内核日志里的真实记录，可作为权威答案。<br>'+
+        '命中 <span class="mono">'+esc(o.rule)+'('+esc(o.arg)+')</span> → '+
+        esc(o.group)+' <span class="pill '+ok+'">'+esc(ot)+'</span><br>'+
+        '<span style="font-size:12px">'+esc(o.ts)+' · '+esc(o.proto)+' · '+esc(o.process)+
+        ' · 近期共 '+o.count+' 条记录</span></div></div>';
+    }else{
+      body += '<div style="padding:12px 18px"><div class="warn">'+
+        '<b>静态推演无法确定</b>：命中规则之前有 IP-CIDR / GEOIP 规则，需要真实 DNS 解析才能判定；'+
+        '该域名在近期内核日志中也没有记录，没有实测数据可以校正。<br>'+
+        '如需确认，可以先用浏览器访问一次该网址，再回来重新查询。</div></div>';
+    }
+  }else if(r.agreement && r.agreement.has_evidence){
+    const a = r.agreement;
+    let txt, st;
+    if(a.any && a.scoped){ txt = "静态推演与实测一致（两个场景都吻合）"; st = "ok"; }
+    else if(a.any){ txt = "静态推演与实测一致：日志显示实际走的是域名分流（场景 B）"; st = "ok"; }
+    else if(a.scoped){ txt = "静态推演与实测一致：日志显示实际走的是进程规则（场景 A）"; st = "ok"; }
+    else { txt = "静态推演与实测不一致：实测结果与两个场景都不吻合，可能配置已变更，或存在本工具未覆盖的规则类型，建议以实测为准"; st = "wn"; }
+    const sty = st === "ok"
+      ? "background:var(--okbg);border-color:var(--ok);color:var(--ok)"
+      : "";
+    body += '<div style="padding:12px 18px"><div class="warn" style="'+sty+'">'+
+      '<b>一致性校验</b> · '+esc(txt)+'<br>'+
+      '<span style="font-size:12px">实测记录：'+esc(r.observed.ts)+' · '+
+      esc(r.observed.process)+' · '+esc(r.observed.group)+'['+esc(r.observed.node)+']'+
+      ' · 近期共 '+r.observed.count+' 条</span></div></div>';
+  }
+
+  if(r.any && r.any.shadowed && r.any.shadowed.length){
+    const rows = r.any.shadowed.map(s =>
+      '<tr><td class="idx">'+s.index+'</td><td class="mono">'+esc(s.raw)+'</td>'+
+      '<td>'+pill(s.outcome)+'</td></tr>').join("");
+    body += '<details><summary>被跳过的规则（'+r.any.shadowed.length+
+      ' 条 · 同样会命中，但优先级更低）</summary><div class="bd">'+
+      '<p class="note">这就是「换个入口进程结果就变了」的原因：这些规则本来会命中，'+
+      '但被排在更前面的规则抢先。</p>'+
+      '<table><thead><tr><th class="idx">序号</th><th>规则</th><th>目标出口</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></div></details>';
+  }
+
+  if(r.evidence && r.evidence.length > 1){
+    const rows = r.evidence.map(e =>
+      '<tr><td class="mono">'+esc(e.ts)+'</td><td class="mono">'+esc(e.proto)+'</td>'+
+      '<td class="mono">'+esc(e.process)+'</td>'+
+      '<td class="mono">'+esc(e.rule)+'('+esc(e.arg)+')</td>'+
+      '<td>'+esc(e.group)+'<br><span style="color:var(--tx3)">['+esc(e.node)+']</span></td></tr>'
+    ).join("");
+    body += '<details><summary>近期日志记录（'+r.evidence.length+
+      ' 条 · 按时间倒序）</summary><div class="bd">'+
+      '<table><thead><tr><th>时间</th><th>协议</th><th>进程</th><th>命中规则</th>'+
+      '<th>出口</th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
+  }
+
+  return '<div class="res"><div class="hd"><div>'+
+    '<div class="u">'+esc(r.url)+'</div>'+
+    '<div class="mt">主机 '+esc(r.host)+' · 端口 '+esc(r.port||"未指定")+
+    ' · 协议 '+esc(r.scheme||"未知")+(r.is_ip?' · IP 直连输入':'')+'</div></div>'+
+    '<div>'+pill(r.scoped && r.scoped.outcome)+'</div></div>'+body+'</div>';
+}
+
+async function analyze(){
+  const raw = $("#urls").value.split("\n").map(s => s.trim()).filter(Boolean);
+  if(!raw.length){ $("#err").innerHTML = '<div class="err">请先输入至少一个网址。</div>'; return; }
+  $("#err").innerHTML = "";
+  const btn = $("#go");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>判定中…';
+  try{
+    const j = await api("/api/analyze", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({urls: raw, process: $("#proc").value})
+    });
+    RESULTS = j.results; FILTER = null;
+    renderSummary(); renderResults();
+  }catch(e){
+    $("#err").innerHTML = '<div class="err">'+esc(e.message)+'</div>';
+    $("#results").innerHTML = ""; $("#summary").innerHTML = "";
+  }finally{
+    btn.disabled = false; btn.textContent = "开始判定";
+  }
+}
+
+/* ---------------- 浏览器体检 ---------------- */
+function checkProcess(){
+  const name = $("#pcheck").value.trim();
+  if(!name){
+    $("#presult").innerHTML = "";
+    return;
+  }
+  const hit = (OVERVIEW.process_rules || []).find(
+    r => r.type === "PROCESS-NAME" && (r.arg||"").toLowerCase() === name.toLowerCase()
+  );
+  if(hit){
+    $("#presult").innerHTML = '<div class="warn" style="margin-top:14px">'+
+      '<b>'+esc(name)+'</b> 在进程规则名单内：命中第 <b>'+hit.index+'</b> 条 '+
+      '<span class="mono">'+esc(hit.raw)+'</span><br>'+
+      '该进程发出的所有连接都会被直接截获，域名规则完全不参与判定。最终出口 '+
+      pill(hit.outcome)+srcNote(hit.outcome)+'</div>';
+  }else{
+    $("#presult").innerHTML = '<div class="warn" style="margin-top:14px;'+
+      'background:var(--okbg);border-color:var(--ok);color:var(--ok)">'+
+      '<b>'+esc(name)+'</b> 不在进程规则名单内，会走域名规则分流：'+
+      '国内域名直连、境外域名走代理、广告域名被拦截。<br>'+
+      '注意：若 Script.js 更新时加入该进程名，会立即失效。</div>';
+  }
+}
+
+/* ---------------- 初始化 ---------------- */
+const SAMPLES = [
+  "https://www.google.com","https://www.baidu.com","https://www.zhihu.com",
+  "https://github.com","https://www.sciencedirect.com","https://www.bilibili.com"
+].join("\n");
+
+const TABS = ["analyze","browsers","groups"];
+function showTab(name){
+  if(TABS.indexOf(name) < 0) name = "analyze";
+  document.querySelectorAll("nav.tabs button").forEach(x =>
+    x.setAttribute("aria-selected", String(x.dataset.tab === name)));
+  TABS.forEach(t => { $("#tab-" + t).hidden = (t !== name); });
+  if(location.hash.slice(1) !== name) history.replaceState(null, "", "#" + name);
+}
+document.querySelectorAll("nav.tabs button").forEach(b => {
+  b.onclick = () => showTab(b.dataset.tab);
+});
+window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+$("#go").onclick = analyze;
+$("#clear").onclick = () => { $("#urls").value = ""; $("#results").innerHTML = "";
+  $("#summary").innerHTML = ""; $("#err").innerHTML = ""; };
+$("#samples").onclick = () => { $("#urls").value = SAMPLES; analyze(); };
+$("#pgo").onclick = checkProcess;
+$("#pcheck").addEventListener("keydown", e => { if(e.key === "Enter") checkProcess(); });
+$("#urls").addEventListener("keydown", e => {
+  if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); analyze(); }
+});
+$("#proc").onchange = () => { if(RESULTS.length) analyze(); };
+
+$("#urls").value = SAMPLES;
+showTab(location.hash.slice(1) || "analyze");
+
+const QS = new URLSearchParams(location.search);
+const qUrls = QS.get("urls");
+if(qUrls){
+  $("#urls").value = qUrls.split(/[\s,;]+/).filter(Boolean).join("\n");
+}
+const qProc = QS.get("process");
+
+loadOverview().then(() => {
+  if(qProc){
+    const sel = $("#proc");
+    if([...sel.options].some(o => o.value === qProc)) sel.value = qProc;
+  }
+  analyze();
+});
+</script>
+</body>
+</html>

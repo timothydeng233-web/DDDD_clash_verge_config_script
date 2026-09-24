@@ -1,0 +1,19 @@
+// 仅为指定订阅添加规则。占位符由 Deploy-ClashVerge.ps1 生成时替换。
+function main(config, profileName) {
+  if (profileName !== __TARGET_SUBSCRIPTION__) return config;
+
+  var available = (config["proxy-groups"] || []).map(function (group) {
+    return group.name;
+  });
+  var required = __REQUIRED_GROUPS__;
+  if (required.some(function (name) {
+    return name !== "DIRECT" && available.indexOf(name) === -1;
+  })) return config;
+
+  var prependRules = [
+    // __DYNAMIC_RULES__
+  ];
+  if (!Array.isArray(config.rules)) config.rules = [];
+  config.rules = prependRules.concat(config.rules);
+  return config;
+}

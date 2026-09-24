@@ -11,7 +11,7 @@
 - 使用当前官方 WinGet ID 安装客户端，但只有显式传入 `-InstallIfMissing` 才会安装。
 - 自动读取最终生成的 `clash-verge.yaml`，识别本机订阅策略组。
 - 基于本机现有 `verge.yaml` 修改少量必要字段，不覆盖主题、快捷键、日志等个人设置。
-- 根据真实策略组生成本机专用 `Merge.yaml`。
+- 根据真实策略组生成通用 `Merge.yaml` 和仅对目标订阅生效的 `Script.js`。
 - 统一生成 OpenAI、ChatGPT、Codex 登录、静态资源、身份认证和 WebSocket 相关规则。
 - 支持 Gemini、Google AI Studio、Gemini API、Google 登录和 Code Assist。
 - 支持 Microsoft Store、微软账号、Office、OneDrive、Teams、Edge 和 Windows Update 关键链路。
@@ -32,7 +32,8 @@
 ```text
 .
 ├── ConfigBackup
-│   ├── Merge.yaml                 # 带 __PROXY_GROUP__ 的公开 Merge 模板
+│   ├── Merge.yaml                 # 不含本机域名和特定代理组的通用模板
+│   ├── Script.js.template         # 带订阅名称守卫的分流模板
 │   ├── Merge.local.example.yaml   # 私有规则示例
 │   ├── Academic.domains.txt       # 学术 PDF/CDN 最小域名清单
 │   ├── Gemini.domains.txt         # Gemini/Google AI 域名规则定义
@@ -44,12 +45,24 @@
 │   └── 本机配置优化建议.md          # 当前电脑建议，仅供参考，不自动执行
 ├── Deploy-ClashVerge.ps1          # Audit / Deploy / Restore 主脚本
 ├── Set-PowerShellProxy.ps1         # PowerShell 会话/用户级代理助手
+├── tests/Validate-Portable.ps1     # 临时沙箱、Mihomo 和订阅隔离验证
+├── tools/clash-route-inspector/    # 只读网址路由检查器
 ├── 双击一键统一部署.bat             # 实际只启动只读审计
 ├── 双击一键还原配置.bat             # 恢复最近一次部署快照
 └── .gitignore                     # 排除本机配置和隐私数据
 ```
 
 真实订阅、节点、私有域名、本机生成配置和部署快照不得提交到 GitHub。
+
+## 在另一台 Windows 电脑使用
+
+1. 从 GitHub 克隆仓库。先安装并启动一次 Clash Verge Rev，导入该电脑自己的订阅。Windows 10 建议使用 22H2；脚本兼容 Windows PowerShell 5.1。仅自动安装功能需要 WinGet（Windows 10 1809 或更新版本）。
+2. 在仓库目录运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Deploy-ClashVerge.ps1 -Action Audit`，核对客户端路径、配置目录、订阅名称和真实策略组。
+3. 以该电脑的实际订阅名称和策略组运行 `-Action IsolatedTest -TargetSubscription "订阅名称" -ProxyGroup "真实策略组"`。若要指定 Gemini 或微软出口，也必须使用该订阅真实存在的组名。
+4. 确认隔离检查通过后，用 `-Action Generate` 查看生成在被 Git 忽略的 `LocalConfig/` 中的 `Merge.yaml`、`Script.js` 和 `verge.yaml`。需要部署时再按下文使用 `-Action Deploy`。
+5. 在客户端中检查目标订阅是否绑定生成的全局 Merge 和 Script 扩展，并刷新订阅。脚本的 `profileName` 必须与 `-TargetSubscription` 一致，否则它会原样返回配置。其他订阅不注入目标订阅的分流规则；全局 Merge 的通用设置仍会作用于绑定它的订阅。
+
+本机专用域名和私有规则应仅保存在目标电脑，不要加入公开模板。仓库不包含订阅链接或节点，因此另一台电脑仍需自行导入订阅。
 
 ## 使用方法
 
@@ -77,7 +90,7 @@
 .\Deploy-ClashVerge.ps1 -Action IsolatedTest -ProxyGroup "🔰 选择节点"
 ```
 
-该操作在系统临时目录生成配置，拒绝可能覆盖订阅节点的顶层 `proxies`、`proxy-providers`、`proxy-groups` 或 `rules`，检查未替换占位符，调用 Mihomo 校验，并确认测试前后本机运行配置哈希一致。临时文件会自动删除。
+该操作在系统临时目录生成配置，拒绝可能覆盖订阅节点的顶层 `proxies`、`proxy-providers`、`proxy-groups` 或 `rules`，检查未替换占位符，调用 Mihomo 校验 Merge，并确认测试前后本机运行配置哈希一致。临时文件会自动删除。仓库附带的 `tests/Validate-Portable.ps1` 还会使用模拟订阅验证生成脚本的隔离行为，并让 Mihomo 校验生成的目标规则；该额外测试需要 Node.js。
 
 PowerShell 默认依赖 TUN。个别工具需要显式代理时，只为当前终端启用：
 
@@ -146,7 +159,7 @@ PowerShell 默认依赖 TUN。个别工具需要显式代理时，只为当前�
 .\Deploy-ClashVerge.ps1 -Action Deploy -InstallIfMissing
 ```
 
-如果当前订阅未绑定默认 `Merge`，脚本会警告。此时需要在 Clash Verge Rev 中为订阅选择 `Merge`，然后刷新订阅。
+请在 Clash Verge Rev 中核对目标订阅的 `Merge` 和 `Script` 扩展绑定，然后刷新订阅。部署脚本写入扩展文件，不自动更改订阅绑定关系。
 
 ### 3. 恢复
 
@@ -168,6 +181,8 @@ PowerShell 默认依赖 TUN。个别工具需要显式代理时，只为当前�
 | `-Action Restore` | 恢复最近一次部署快照 |
 | `-InstallPath` | 显式指定 `clash-verge.exe` |
 | `-ConfigDir` | 显式指定用户配置目录 |
+| `-SnapshotPath` | `Restore` 时指定要恢复的精确快照；省略则恢复最新快照 |
+| `-TargetSubscription` | 指定分流规则匹配的订阅名称（默认 `ikuuu`）；在其他电脑应显式传入实际名称 |
 | `-ProxyGroup` | 指定订阅中真实存在的策略组 |
 | `-GeminiGroup` | Gemini 策略组；省略时复用主策略组 |
 | `-AcademicGroup` | ScienceDirect PDF/Elsevier CDN 出口，默认 `DIRECT`；可指定本机真实存在的校园策略组 |
@@ -202,7 +217,7 @@ PowerShell 默认依赖 TUN。个别工具需要显式代理时，只为当前�
 7. 设置 MTU 前检查 Windows 出口网卡、TUN 网卡、WSL 网络模式和实际路径 MTU。不得把 1500 当成所有电脑的固定值。
 8. 不要把整个浏览器、PowerShell、VS Code、Codex、WebView2 或 Microsoft Store 进程强制代理。本地回环和私有网段应使用目标地址直连规则。
 9. 部署必须通过 `-Action Deploy` 执行，让脚本再次在临时目录完成隔离预检，再创建时间戳快照、安装文件并在失败时回滚。不要绕过快照直接覆盖 AppData 文件。
-10. 部署后确认 Clash Verge Rev 保持运行，并提醒用户确认当前订阅已经绑定 `Merge` 后刷新。
+10. 部署后确认 Clash Verge Rev 保持运行，并提醒用户核对目标订阅的 `Merge`、`Script` 扩展绑定后刷新。
 11. 不得把目标电脑生成的配置、快照、订阅或私有规则提交到 GitHub。
 12. `ConfigBackup/*.domains.txt` 是各服务网络依赖的规则来源；更新时必须重新执行 Audit、IsolatedTest 和 Test。
 13. 校外访问 ScienceDirect 时，正文和机构认证可继续由 EasyConnect 接管；PDF 与 Elsevier CDN 默认 `DIRECT`，也可用 `-AcademicGroup` 指向目标电脑真实存在的校园策略组，但不得猜测组名。实际 PDF 成功率仍需在已登录浏览器中低频验证，避免连续刷新触发风控。
@@ -215,7 +230,7 @@ PowerShell 默认依赖 TUN。个别工具需要显式代理时，只为当前�
 - `profile.block-quic` 不是 Mihomo 通用配置项，因此已经移除。可选 QUIC 阻断通过明确的 UDP/443 规则完成。
 - `dns.listen` 不再强制设置为 `0.0.0.0:53`，避免无必要的局域网监听和端口冲突。
 - MTU 默认不覆盖。`mixed` TUN 栈保留为模板建议，但仍应由 Codex 根据目标机器检查。
-- 默认规则不包含任何作者私有域名。私有规则应写入被 `.gitignore` 排除的 `*.local.yaml`，由 Codex 在本机合并。
+- 默认规则不包含任何作者私有域名。私有规则可写入被 `.gitignore` 排除的 `*.local.yaml`，由 Codex 在目标电脑审计后处理。
 - OpenAI 域名规则从独立清单生成，避免模板、审计逻辑和建议文档各自维护不同版本。
 - Microsoft 官方说明 Store/Windows Update 依赖账号认证、许可证、目录、更新与 Delivery Optimization 多组端点，因此项目将控制链路和下载链路分开管理：[Windows 11 端点](https://learn.microsoft.com/en-us/windows/privacy/manage-windows-11-endpoints)、[Delivery Optimization](https://learn.microsoft.com/en-us/windows/deployment/do/waas-delivery-optimization-faq)。
 - 下载规则支持 TCP 80/443 的域名分流；不代理局域网 P2P 端口 7680，也不改变 Delivery Optimization 或 Windows Update 服务配置。
